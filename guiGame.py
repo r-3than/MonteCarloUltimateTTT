@@ -640,7 +640,6 @@ class Node:
                 return "WIN"
             if isWon == "LOSS":
                 self.lossAmongChildren = self.lossAmongChildren + 1
-                if self.lossAmongChildren == self.playouts:
                 return "LOSS"
             if isWon == "DRAW":
                 self.winningAmongChildren = self.winningAmongChildren + 0.5
