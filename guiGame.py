@@ -422,6 +422,17 @@ class Game:
         self.hasWon = False
         self.reset()
 
+    def amtbox(self):
+        temp = 0
+        for i in self.boxes:
+            for j in i:
+                if j.OwnedBy != 0:
+                    temp = temp+1
+        if temp >= 4:
+            return True
+        else:
+            return False
+
     def reset(self):
         self.lastreward = 0
         self.hasWon = False
@@ -647,6 +658,15 @@ class Node:
             return "DRAW"
         if len(moves) != 0:
             move = moves[random.randint(0,len(moves)-1)]
+            if self.currentEnv.amtbox():
+                for mov in moves:
+                    tempEnv = Game()
+                    self.currentEnv.copy(tempEnv)
+                    r = tempEnv.step(mov)
+                    if r == (-1,1):
+                        move = mov
+                    if r ==(1,1):
+                        move = mov
         if self.children != None:
             for child in self.children:
                 if child.move == move:

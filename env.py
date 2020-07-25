@@ -54,6 +54,17 @@ class Game:
         self.hasWon = False
         self.reset()
 
+    def amtbox(self):
+        temp = 0
+        for i in self.boxes:
+            for j in i:
+                if j.OwnedBy != 0:
+                    temp = temp+1
+        if temp >= 4:
+            return True
+        else:
+            return False
+
     def reset(self):
         self.lastreward = 0
         self.hasWon = False
@@ -219,11 +230,12 @@ class Node:
         self.move = move
         self.currentEnv = env
         self.r = r
-        self.playouts = 0
+        self.playouts = 1
         self.winningAmongChildren = 0
         self.lossAmongChildren = 0
         self.children = None
         self.prob = 0
+        self.UCT = 0
     def getChildren(self):
         if self.children == None:
             self.children = []
@@ -236,13 +248,31 @@ class Node:
         else:
             for child in self.children:
                 child.getChildren()
+    def eval(self):
+        if self.parent != None:
+
+            try:
+                self.UCT = self.winningAmongChildren/self.playouts + sqrt(2)*sqrt(np.log(self.parent.playouts)/self.playouts)
+            except:
+                print(np.log(self.parent.playouts),self.playouts)
+
+            #print(self.UCT)
+    def highestChildUCT(self):
+        highestUCT = 0
+        tempChild = None
+        if self.children != None:
+            for child in self.children:
+                if child.UCT >= highestUCT:
+                    highestUCT = child.UCT
+                    tempChild = child
+        return tempChild
     def printChildren(self):
         if self.children != None:
             for child in self.children:
                 child.printChildren()
         else:
             self.currentEnv.render()
-    def playout(self):
+    def playout(self,useUCT=True):
         self.playouts = self.playouts + 1
         found = False
         nextPlay = None
@@ -255,11 +285,20 @@ class Node:
         if self.r == (1,0) or self.r == (-1,1):
             self.lossAmongChildren = self.lossAmongChildren + 1
             self.prob = -999
-            return "LOSS"
+            return "fLOSS"
         if self.r == (1,2) or self.r == (-1,2):
             return "DRAW"
         if len(moves) != 0:
             move = moves[random.randint(0,len(moves)-1)]
+            if self.currentEnv.amtbox():
+                for mov in moves:
+                    tempEnv = Game()
+                    self.currentEnv.copy(tempEnv)
+                    r = tempEnv.step(mov)
+                    if r == (-1,1):
+                        move = mov
+                    if r ==(1,1):
+                        move = mov
         if self.children != None:
             for child in self.children:
                 if child.move == move:
@@ -275,24 +314,33 @@ class Node:
             newNode = Node(self,move,newEnv,r)
             self.children.append(newNode)
             nextPlay = newNode
-
+        if random.randint(0,10) > 2 and useUCT:
+            this = self.highestChildUCT()
+            if this != None:
+                nextPlay = this
         #if self.lossAmongChildren > self.winningAmongChildren * 5:
         #    return "END"
+        self.eval()
         if nextPlay != None:
-            isWon = nextPlay.playout()
+            isWon = nextPlay.playout(useUCT)
             if isWon == "WIN":
                 #print("WINNNERRR!")
                 self.winningAmongChildren = self.winningAmongChildren + 1
                 self.prob = round(self.winningAmongChildren/self.playouts,5)
                 return "WIN"
+            if isWon == "fLOSS":
+                self.winningAmongChildren = 0
+                self.prob = -999
+                self.lossAmongChildren = self.lossAmongChildren + 1
+                return "LOSS"
             if isWon == "LOSS":
                 self.lossAmongChildren = self.lossAmongChildren + 1
-                if self.lossAmongChildren == self.playouts:
                 return "LOSS"
             if isWon == "DRAW":
                 self.winningAmongChildren = self.winningAmongChildren + 0.5
                 self.prob = round(self.winningAmongChildren/self.playouts,5)
                 return "DRAW"
+
     def handover(self):
         for item in self.currentEnv.getMoves():
             found = False
@@ -322,7 +370,9 @@ class MonteThread:
 
 class MonteCarlo:
     def __init__(self,env):
-        self.playouts = 100
+        self.playouts = 50
+        self.currentplayouts = 0
+        self.maxPlayouts = 1000
         self.env = env
         self.threads = []
         self.children = []
@@ -341,11 +391,19 @@ class MonteCarlo:
         for child in self.children:
             child.printChildren()
     def sim(self):
+        self.currentplayouts = self.currentplayouts + self.playouts
         for y in range(0,self.playouts):
+
             for child in self.children:
                 newThread = threading.Thread(target=child.playout)
                 aMontThread = MonteThread(newThread)
                 self.threads.append(aMontThread)
+
+    def singleSim(self):
+        for child in self.children:
+            newThread = threading.Thread(target=child.playout,args=(False,))
+            aMontThread = MonteThread(newThread)
+            self.threads.append(aMontThread)
     def printProb(self):
         for child in self.children:
             print((child.prob,child.move))
@@ -365,18 +423,21 @@ class MonteCarlo:
                 if len(self.threads) == 0:
                     threadFinished = True"""
         Probs = self.getProb()
-        print(Probs)
+        #print(Probs)
         max = 0
         move = None
         for prob in Probs:
             if prob[0] >= max:
                 max = prob[0]
                 move = prob[1]
+        print("I think I have a ,", max,"% chance of winning!")
         return move
     def parse(self,move):
+        self.currentplayouts = 0
         for child in self.children:
             if child.move == move:
                 self.children = child.handover()
+
 
 env = Game()
 MC = MonteCarlo(env)
