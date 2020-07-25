@@ -424,8 +424,8 @@ class MonteCarlo:
                     threadFinished = True"""
         Probs = self.getProb()
         #print(Probs)
-        max = 0
-        move = None
+        max = Probs[0][0]
+        move = Probs[0][1]
         for prob in Probs:
             if prob[0] >= max:
                 max = prob[0]
